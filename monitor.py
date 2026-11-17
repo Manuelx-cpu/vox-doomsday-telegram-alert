@@ -317,22 +317,22 @@ def main() -> int:
         log.info("Sent activation confirmation to Telegram.")
 
     matches = asyncio.run(monitor_vox(debug=debug))
-    if not matches:
-    log.info("No qualifying Mall of Egypt sessions found for 24–31 Dec 2026.")
-    now = datetime.now(TIMEZONE)
-    report_date = now.date().isoformat()
-    if now.hour == 23 and now.minute >= 55 and state.get("clear_status_date") != report_date:
-        telegram_send(
-            "✅ <b>Daily update: still clear.</b>\n\n"
-            f"No showtimes for {html.escape(MOVIE_TITLE)} at "
-            f"{html.escape(CINEMA_NAME)} on 24–31 December 2026 "
-            f"were showing by the end of {now.strftime('%A, %-d %B')} "
-            "Africa/Cairo time."
-        )
-        state["clear_status_date"] = report_date
-        save_state(state)
-        log.info("Sent end-of-day clear update.")
-    return 0
+        if not matches:
+        log.info("No qualifying Mall of Egypt sessions found for 24–31 Dec 2026.")
+        now = datetime.now(TIMEZONE)
+        report_date = now.date().isoformat()
+        if now.hour == 23 and now.minute >= 55 and state.get("clear_status_date") != report_date:
+            telegram_send(
+                "✅ <b>Daily update: still clear.</b>\n\n"
+                f"No showtimes for {html.escape(MOVIE_TITLE)} at "
+                f"{html.escape(CINEMA_NAME)} on 24–31 December 2026 "
+                f"were showing by the end of {now.strftime('%A, %-d %B')} "
+                "Africa/Cairo time."
+            )
+            state["clear_status_date"] = report_date
+            save_state(state)
+            log.info("Sent end-of-day clear update.")
+        return 0
 
     telegram_send(build_alert(matches))
     state["alert_sent"] = True
