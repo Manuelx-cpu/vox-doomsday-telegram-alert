@@ -23,6 +23,12 @@ jobs:
         with:
           persist-credentials: true
 
+      - name: Test VOX reachability
+        run: |
+          curl -sSL --max-time 20 -o /dev/null \
+            -w 'HTTP %{http_code} | %{remote_ip} | %{time_total}s\n' \
+            'https://egy.voxcinemas.com/showtimes?c=mall-of-egypt&m=avengers-doomsday-infinity-vision' || true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
