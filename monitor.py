@@ -19,9 +19,9 @@ import requests
 from playwright.async_api import BrowserContext, Frame, Page, async_playwright
 
 VOX_MOVIE_URL = (
-    "https://egy.voxcinemas.com/showtimes?c=mall-of-egypt&m=avengers-doomsday-infinity-vision"
+    "https://egy.voxcinemas.com/showtimes"
+    "?c=mall-of-egypt&m=avengers-doomsday-infinity-vision"
 )
-VOX_CINEMA_URL = "https://egy.voxcinemas.com/showtimes/mall-of-egypt"
 MOVIE_TITLE = "Avengers: Doomsday (Infinity Vision)"
 CINEMA_NAME = "Mall of Egypt"
 START_DATE = date(2026, 12, 24)
@@ -75,7 +75,8 @@ def load_state() -> dict[str, Any]:
 def save_state(state: dict[str, Any]) -> None:
     temporary = STATE_PATH.with_suffix(".tmp")
     temporary.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
     )
     temporary.replace(STATE_PATH)
 
@@ -105,11 +106,15 @@ def telegram_send(text: str) -> None:
 
 
 def normalized_lines(text: str) -> list[str]:
-    return [re.sub(r"\s+", " ", line).strip() for line in text.splitlines() if line.strip()]
+    return [
+        re.sub(r"\s+", " ", line).strip()
+        for line in text.splitlines()
+        if line.strip()
+    ]
 
 
 def get_target_venue_times(text: str) -> list[str]:
-    """Extract times only from the Mall of Egypt block, not other VOX cinemas."""
+    """Extract times only from the Mall of Egypt block."""
     lines = normalized_lines(text)
     venue_positions = [
         index
@@ -127,11 +132,14 @@ def get_target_venue_times(text: str) -> list[str]:
                 end = index
                 break
         segment = "\n".join(lines[start + 1 : end])
-        times = [re.sub(r"\s+", "", match).lower() for match in TIME_RE.findall(segment)]
+        times = [
+            re.sub(r"\s+", "", match).lower()
+            for match in TIME_RE.findall(segment)
+        ]
         if times:
             all_times.extend(times)
 
-    # Stable de-duplication while preserving the order VOX displays.
+    # Remove duplicates while preserving VOX's display order.
     return list(dict.fromkeys(all_times))
 
 
@@ -156,24 +164,39 @@ async def click_date_label(frame: Frame, label: str) -> bool:
         return bool(
             await frame.evaluate(
                 r"""(wanted) => {
-                    const norm = value => (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+                    const norm = value =>
+                        (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
                     const candidates = [...document.querySelectorAll(
                         'button, a, [role="button"], [onclick], li, span, div'
-                    )].filter(el => norm(el.innerText || el.textContent) === norm(wanted));
+                    )].filter(
+                        el => norm(el.innerText || el.textContent) === norm(wanted)
+                    );
                     if (!candidates.length) return false;
                     candidates.sort((a, b) =>
                         (a.innerText || a.textContent || '').length -
                         (b.innerText || b.textContent || '').length
                     );
                     let target = candidates[0];
-                    for (let node = target; node && node !== document.body; node = node.parentElement) {
+                    for (
+                        let node = target;
+                        node && node !== document.body;
+                        node = node.parentElement
+                    ) {
                         const style = window.getComputedStyle(node);
-                        if (node.matches('button, a, [role="button"], [onclick]') || style.cursor === 'pointer') {
+                        if (
+                            node.matches(
+                                'button, a, [role="button"], [onclick]'
+                            ) ||
+                            style.cursor === 'pointer'
+                        ) {
                             target = node;
                             break;
                         }
                     }
-                    target.scrollIntoView({block: 'center', inline: 'center'});
+                    target.scrollIntoView({
+                        block: 'center',
+                        inline: 'center'
+                    });
                     target.click();
                     return true;
                 }""",
@@ -193,11 +216,12 @@ async def read_body(frame: Frame) -> str:
 
 async def monitor_vox(debug: bool = False) -> list[dict[str, str]]:
     matches: list[dict[str, str]] = []
+
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(
-    headless=True,
-    args=["--disable-http2"],
-)
+            headless=True,
+            args=["--disable-http2"],
+        )
         context: BrowserContext = await browser.new_context(
             locale="en-GB",
             timezone_id="Africa/Cairo",
@@ -207,8 +231,9 @@ async def monitor_vox(debug: bool = False) -> list[dict[str, str]]:
             ),
         )
         page: Page = await context.new_page()
+
         try:
-            log.info("Opening official VOX Infinity Vision movie page")
+            log.info("Opening official VOX Mall of Egypt Infinity Vision showtimes")
             await page.goto(
                 VOX_MOVIE_URL,
                 wait_until="domcontentloaded",
@@ -216,8 +241,7 @@ async def monitor_vox(debug: bool = False) -> list[dict[str, str]]:
             )
             await page.wait_for_timeout(5000)
 
-            # The movie page can contain a booking frame. Inspect the main page and
-            # every child frame because VOX may move booking content into an iframe.
+            # Inspect the main page and child frames for booking content.
             frames = list(page.frames)
             for frame in frames:
                 await scroll_date_strips(frame)
@@ -238,12 +262,17 @@ async def monitor_vox(debug: bool = False) -> list[dict[str, str]]:
                     log.info("Date tab not exposed yet: %s", DATE_LABELS[target_date])
                     continue
 
-                # Re-read all frames after the date selection; session details may
-                # be rendered in the page or in its booking iframe.
-                page_texts = [await read_body(frame) for frame in list(page.frames)]
+                # Re-read all frames after selecting the date.
+                page_texts = [
+                    await read_body(frame) for frame in list(page.frames)
+                ]
                 combined_text = "\n".join(text for text in page_texts if text)
                 if debug:
-                    log.info("After selecting %s, page text:\n%s", DATE_LABELS[target_date], combined_text[:12000])
+                    log.info(
+                        "After selecting %s, page text:\n%s",
+                        DATE_LABELS[target_date],
+                        combined_text[:12000],
+                    )
 
                 times = get_target_venue_times(combined_text)
                 if times:
@@ -277,7 +306,8 @@ def build_alert(matches: list[dict[str, str]]) -> str:
     ]
     for match in matches:
         lines.append(
-            f"• {html.escape(match['date_label'])}: {html.escape(match['times'])}"
+            f"• {html.escape(match['date_label'])}: "
+            f"{html.escape(match['times'])}"
         )
     lines.extend(
         [
@@ -308,8 +338,9 @@ def main() -> int:
     if not state.get("initialized"):
         telegram_send(
             "✅ <b>VOX booking monitor is active.</b>\n\n"
-            f"Watching {html.escape(MOVIE_TITLE)} at {html.escape(CINEMA_NAME)} "
-            "for showtimes from 24 to 31 December 2026.\n"
+            f"Watching {html.escape(MOVIE_TITLE)} at "
+            f"{html.escape(CINEMA_NAME)} for showtimes from "
+            "24 to 31 December 2026.\n"
             "I will send one alert when the first matching session appears."
         )
         state["initialized"] = True
@@ -317,11 +348,21 @@ def main() -> int:
         log.info("Sent activation confirmation to Telegram.")
 
     matches = asyncio.run(monitor_vox(debug=debug))
-        if not matches:
-        log.info("No qualifying Mall of Egypt sessions found for 24–31 Dec 2026.")
+
+    if not matches:
+        log.info(
+            "No qualifying Mall of Egypt sessions found for 24–31 Dec 2026."
+        )
         now = datetime.now(TIMEZONE)
         report_date = now.date().isoformat()
-        if now.hour == 23 and now.minute >= 55 and state.get("clear_status_date") != report_date:
+
+        # The workflow runs every five minutes; this catches its last run
+        # before midnight Cairo time and sends no more than one clear report daily.
+        if (
+            now.hour == 23
+            and now.minute >= 55
+            and state.get("clear_status_date") != report_date
+        ):
             telegram_send(
                 "✅ <b>Daily update: still clear.</b>\n\n"
                 f"No showtimes for {html.escape(MOVIE_TITLE)} at "
@@ -332,12 +373,15 @@ def main() -> int:
             state["clear_status_date"] = report_date
             save_state(state)
             log.info("Sent end-of-day clear update.")
+
         return 0
 
     telegram_send(build_alert(matches))
     state["alert_sent"] = True
     state["matches"] = matches
-    state["alert_sent_at"] = datetime.now(TIMEZONE).isoformat(timespec="seconds")
+    state["alert_sent_at"] = datetime.now(TIMEZONE).isoformat(
+        timespec="seconds"
+    )
     save_state(state)
     log.info("Alert delivered; monitoring is now complete.")
     return 0
