@@ -1,5 +1,6 @@
 {
-  "initialized": false,
+  "activation_sent": false,
   "alert_sent": false,
-  "matches": []
+  "matches": [],
+  "last_clear_status_date": null
 }

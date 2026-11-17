@@ -1,66 +1,49 @@
 # VOX Doomsday Telegram booking alert
 
-This Python project checks the **VOX Egypt page dedicated to Avengers: Doomsday (Infinity Vision)** and sends one Telegram notification when it finds bookable showtimes at **Mall of Egypt** for **24–31 December 2026**.
+Watches the VOX Egypt showtimes page for **Avengers: Doomsday – Infinity Vision at Mall of Egypt** and messages you on Telegram when a showtime for **24–31 December 2026** appears:
 
-It does not monitor the standard Doomsday listing or other VOX cinemas. It checks the date tabs individually and looks for actual session times inside the Mall of Egypt section.
+<https://egy.voxcinemas.com/showtimes?c=mall-of-egypt&m=avengers-doomsday-infinity-vision>
 
-## Hosting
+It checks only Mall of Egypt and only those eight dates. It runs on GitHub Actions every five minutes (GitHub may delay scheduled runs, so alerts are not guaranteed to be instant).
 
-The included GitHub Actions workflow runs the check every five minutes. It is suitable for a small personal monitor and does not require an always-on computer. GitHub documents five minutes as the shortest supported schedule interval; scheduled runs can be delayed during busy periods, so this is not a guaranteed real-time alert.
+## What you receive
 
-For the free scheduled-run model, create a **public GitHub repository** for this code. The Telegram token and chat ID must be saved only as GitHub Actions secrets; never put them in the source files. The repository contains no personal data or credentials.
+| Message | When |
+| --- | --- |
+| **Monitor is active** | Once, after the first check in which the VOX page really loaded. |
+| **Showtimes are live** | As soon as a matching showtime is found: date, times, cinema and a link. Monitoring then stops. |
+| **Still clear** | At most once per Cairo calendar day, from 22:30 Cairo time, if the page was checked successfully and nothing matched. |
 
-## 1. Create your Telegram bot
+Monitoring also stops after 31 December 2026 (Cairo time).
 
-1. Open [@BotFather](https://t.me/BotFather) in Telegram.
-2. Send `/newbot`, follow the prompts, and copy the bot token BotFather gives you.
-3. Open the new bot using the link BotFather provides and press **Start**. Send `/start` in the chat.
+## Failures are never "no showtimes"
 
-## 2. Find your Telegram chat ID
+If VOX cannot be loaded (timeout, HTTP error, block or challenge page) or the page layout is not understood, the run **fails** and logs diagnostics. No "active" or "still clear" message is sent from a failed check.
 
-On a computer with Python installed:
+## Setup
 
-```bash
-pip install requests
-python get_chat_id.py
-```
+1. Create a Telegram bot with [@BotFather](https://t.me/BotFather), open it and press **Start**.
+2. Find your chat ID with `python get_chat_id.py` (the token prompt is hidden).
+3. In the repository: **Settings → Secrets and variables → Actions**, add the secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Never commit them.
+4. **Settings → Actions → General → Workflow permissions**: allow read and write (the workflow commits `state.json`).
+5. **Actions → Monitor VOX Doomsday showtimes → Run workflow**. Tick `debug` to print the VOX page text per date.
 
-Paste the bot token when prompted. The script hides token input and prints the chat ID. If it says there are no updates, send `/start` to your bot and run it again.
+## Reading the run log
 
-## 3. Put the project on GitHub
+- `VOX reachability: HTTP … | remote_ip=… | elapsed=…` shows whether the runner can reach VOX at all.
+- `Response after …s: HTTP …` and `VOX page recognised` confirm that the browser loaded the page.
+- `Date tabs visible: …` lists the dates VOX exposes; `MATCH …` lines are found showtimes.
 
-1. Create a new **public** repository, for example `vox-doomsday-telegram-alert`.
-2. Extract this project ZIP and upload its contents to the repository root. Keep the `.github/workflows/monitor.yml` folder structure intact.
-3. In the repository, open **Settings → Secrets and variables → Actions → New repository secret**.
-4. Add these two secrets exactly:
-   - `TELEGRAM_BOT_TOKEN` — the token from BotFather.
-   - `TELEGRAM_CHAT_ID` — the chat ID from step 2.
-5. Open **Settings → Actions → General → Workflow permissions** and select **Read and write permissions**. Save.
-6. Open the **Actions** tab, select **Monitor VOX Doomsday booking**, and choose **Run workflow** to test the setup.
+## Files
 
-You should receive a Telegram message confirming that the monitor is active. The scheduled checks then continue automatically.
+- `monitor.py`: the checker (Playwright Chromium, `--disable-http2`).
+- `.github/workflows/monitor.yml`: schedule, diagnostics, state commit.
+- `state.json`: which messages were already sent; committed by the workflow.
 
-## How the alert works
-
-- Source: [VOX Avengers: Doomsday (Infinity Vision)](https://egy.voxcinemas.com/movies/avengers-doomsday-infinity-vision)
-- Venue: Mall of Egypt only.
-- Dates: 24–31 December 2026 inclusive.
-- Poll interval: five minutes, subject to GitHub Actions scheduling delays.
-- Trigger: a date in the requested range has one or more session times listed under Mall of Egypt on the Infinity Vision-specific movie page.
-- After the first match, the bot sends one alert and marks the monitor complete. It does not keep sending repeat alerts.
-- The requested date window ends on 31 December 2026; checks stop after that date.
-
-## Manual test / troubleshooting
-
-- Check the latest run under **Actions**. The job log reports which date tabs were visible and whether any Mall of Egypt sessions were found.
-- If Telegram does not receive the activation message, check that the two repository secrets are spelled correctly and that you pressed Start / sent `/start` to your bot.
-- If VOX changes its page layout, the monitor may need its date-tab or showtime parsing updated. A failed or blocked page read is not treated as booking availability.
-- You can run the script locally after installing the dependencies and Chromium:
+## Local run
 
 ```bash
 pip install -r requirements.txt
 python -m playwright install chromium
-TELEGRAM_BOT_TOKEN="your-token" TELEGRAM_CHAT_ID="your-chat-id" python monitor.py --debug
+TELEGRAM_BOT_TOKEN="…" TELEGRAM_CHAT_ID="…" python monitor.py --debug
 ```
-
-Do not commit your token or chat ID to GitHub.
