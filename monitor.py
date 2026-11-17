@@ -19,7 +19,7 @@ import requests
 from playwright.async_api import BrowserContext, Frame, Page, async_playwright
 
 VOX_MOVIE_URL = (
-    "https://egy.voxcinemas.com/movies/avengers-doomsday-infinity-vision"
+    "https://egy.voxcinemas.com/showtimes?c=mall-of-egypt&m=avengers-doomsday-infinity-vision"
 )
 VOX_CINEMA_URL = "https://egy.voxcinemas.com/showtimes/mall-of-egypt"
 MOVIE_TITLE = "Avengers: Doomsday (Infinity Vision)"
@@ -194,7 +194,10 @@ async def read_body(frame: Frame) -> str:
 async def monitor_vox(debug: bool = False) -> list[dict[str, str]]:
     matches: list[dict[str, str]] = []
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
+        browser = await playwright.chromium.launch(
+    headless=True,
+    args=["--disable-http2"],
+)
         context: BrowserContext = await browser.new_context(
             locale="en-GB",
             timezone_id="Africa/Cairo",
@@ -315,8 +318,21 @@ def main() -> int:
 
     matches = asyncio.run(monitor_vox(debug=debug))
     if not matches:
-        log.info("No qualifying Mall of Egypt sessions found for 24–31 Dec 2026.")
-        return 0
+    log.info("No qualifying Mall of Egypt sessions found for 24–31 Dec 2026.")
+    now = datetime.now(TIMEZONE)
+    report_date = now.date().isoformat()
+    if now.hour == 23 and now.minute >= 55 and state.get("clear_status_date") != report_date:
+        telegram_send(
+            "✅ <b>Daily update: still clear.</b>\n\n"
+            f"No showtimes for {html.escape(MOVIE_TITLE)} at "
+            f"{html.escape(CINEMA_NAME)} on 24–31 December 2026 "
+            f"were showing by the end of {now.strftime('%A, %-d %B')} "
+            "Africa/Cairo time."
+        )
+        state["clear_status_date"] = report_date
+        save_state(state)
+        log.info("Sent end-of-day clear update.")
+    return 0
 
     telegram_send(build_alert(matches))
     state["alert_sent"] = True
