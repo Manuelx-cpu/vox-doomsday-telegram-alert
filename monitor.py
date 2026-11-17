@@ -236,7 +236,7 @@ async def monitor_vox(debug: bool = False) -> list[dict[str, str]]:
             log.info("Opening official VOX Mall of Egypt Infinity Vision showtimes")
             await page.goto(
                 VOX_MOVIE_URL,
-                wait_until="domcontentloaded",
+               wait_until="commit",
                 timeout=60000,
             )
             await page.wait_for_timeout(5000)
