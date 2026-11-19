@@ -32,6 +32,44 @@ jobs:
         run: |
           python -m playwright install --with-deps chromium
 
+      - name: Diagnose VOX HTTP connectivity
+        run: |
+          python - <<'PY'
+          import requests, time
+
+          urls = [
+              "https://egy.voxcinemas.com/",
+              "https://egy.voxcinemas.com/movies/avengers-doomsday-infinity-vision",
+              "https://egy.voxcinemas.com/showtimes",
+          ]
+
+          headers = {
+              "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
+          }
+
+          for url in urls:
+              print(f"\n--- Testing {url} ---", flush=True)
+              started = time.monotonic()
+
+              try:
+                  r = requests.get(
+                      url,
+                      headers=headers,
+                      timeout=(15, 30),
+                      allow_redirects=True
+                  )
+                  print("HTTP status:", r.status_code)
+                  print("Elapsed:", round(time.monotonic() - started, 1), "seconds")
+                  print("Final URL:", r.url)
+                  print("Content-Type:", r.headers.get("content-type"))
+                  print("Downloaded bytes:", len(r.content))
+                  print("Response sample:", r.text[:250])
+
+              except requests.RequestException as e:
+                  print("REQUEST FAILED:", type(e).__name__, str(e))
+
+          PY
+
       - name: Run VOX monitor
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
