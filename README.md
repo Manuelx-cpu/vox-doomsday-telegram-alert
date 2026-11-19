@@ -1,21 +1,30 @@
 # VOX Avengers: Doomsday (Infinity Vision) Monitor
 
-Official movie page monitored:
-https://egy.voxcinemas.com/movies/avengers-doomsday-infinity-vision
+Watches https://egy.voxcinemas.com/movies/avengers-doomsday-infinity-vision
+for Mall of Egypt showtimes on 24-31 December 2026 and sends a Telegram alert
+as soon as any appear.
 
-Target: Mall of Egypt, 24–31 December 2026.
+## Files
+- `monitor.py` - the checker (repo root)
+- `requirements.txt`, `state.json` - repo root
+- `.github/workflows/monitor.yml` - the schedule (every 10 minutes)
 
-## Android / GitHub setup
-1. Create a repository on GitHub (or use your existing repository after removing old files).
-2. Upload the ZIP contents, preserving folders.
-3. Put `monitor.py`, `requirements.txt`, `state.json`, `.gitignore`, and `README.md` in the repository root.
-4. Put `monitor.yml` exactly in `.github/workflows/monitor.yml`.
-5. In the repository open Settings → Secrets and variables → Actions → New repository secret.
-6. Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` using the existing values. Do not put them in code or screenshots.
-7. Open Actions → VOX Avengers Doomsday Monitor → Run workflow.
-8. Open the run and inspect the `Run monitor` step. A successful run prints `Check complete`.
-9. Keep only one active copy of the workflow to avoid duplicate alerts.
+## Setup
+1. Repository -> Settings -> Secrets and variables -> Actions.
+2. Add secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Never put them in code.
+3. Actions -> VOX Avengers Doomsday Monitor -> Run workflow.
+4. Open the run, check the "Run VOX monitor" step. Success prints `Check complete`.
 
-GitHub Actions runs on GitHub's cloud; your Android phone and PC do not need to stay on. The schedule is every 5 minutes, but GitHub can delay scheduled runs.
+## Behavior
+- A page that fails to load (e.g. HTTP 403) fails the run. It is never treated as "no bookings".
+- One alert when showtimes appear, then the monitor stops checking.
+- One "still clear" Telegram message per day after 22:00 Cairo time.
+- Stops automatically after 31 Dec 2026.
+- `state.json` is only committed when something changes.
 
-IMPORTANT: This is a fresh rebuild with HTTP/2 disabled and page-load retries. It still requires a successful live GitHub Actions test: VOX may change its page structure or date-selector behavior. Do not assume monitoring is validated until the first run succeeds and its log is checked.
+## Known limits
+- GitHub may delay scheduled runs.
+- VOX may block GitHub's IP ranges (403). If so, run `python monitor.py`
+  from a home machine or VPS with the two secrets as environment variables.
+- Date-tab and Mall of Egypt detection depend on VOX's page layout. Check the
+  first run's log lines "Date tabs found" and "Mall block sample".
