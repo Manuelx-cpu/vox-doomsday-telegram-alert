@@ -31,6 +31,17 @@ jobs:
       - name: Install Chromium and system dependencies
         run: python -m playwright install --with-deps chromium
 
+      - name: Diagnose VOX connectivity
+        continue-on-error: true
+        run: |
+          U="https://egy.voxcinemas.com/movies/avengers-doomsday-infinity-vision"
+          for v in --http1.1 --http2; do
+            echo "== curl $v =="
+            curl $v -sS -m 25 -o /dev/null -A "Mozilla/5.0" \
+              -w "connect=%{time_connect}s tls=%{time_appconnect}s first_byte=%{time_starttransfer}s code=%{http_code}\n" \
+              "$U" || echo "curl failed with exit code $?"
+          done
+
       - name: Run VOX monitor
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
